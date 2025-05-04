@@ -17,13 +17,30 @@
     }
     .container {
       max-width: 480px;
-      margin: 0 auto;
+      margin: 3rem auto 0 auto;
       padding: 1.5rem;
       background: #1e1e1e;
       border-radius: 12px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+      position: relative;
     }
-    h2 { text-align: center; margin-bottom: 1rem; color: #ffffff; }
+    .theme-toggle-wrapper {
+      position: absolute;
+      top: -2.5rem;
+      right: 0;
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      font-size: 1.2rem;
+    }
+    h2 {
+      text-align: center;
+      margin-bottom: 1rem;
+      color: #ffffff;
+    }
+    body.light h2 {
+      color: #000000;
+    }
     label { display: block; margin: 0.5rem 0 0.2rem; font-weight: bold; color: #dddddd; }
     input, select {
       width: 100%; padding: 0.6rem; margin-bottom: 0.8rem;
@@ -53,17 +70,89 @@
       width: auto;
       margin: 0;
     }
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 50px;
+      height: 26px;
+    }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0;
+      right: 0; bottom: 0;
+      background-color: #ccc;
+      transition: 0.4s;
+      border-radius: 34px;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 20px; width: 20px;
+      left: 3px; bottom: 3px;
+      background-color: white;
+      transition: 0.4s;
+      border-radius: 50%;
+    }
+    input:checked + .slider {
+      background-color: #2196F3;
+    }
+    input:checked + .slider:before {
+      transform: translateX(24px);
+    }
+    body.light {
+      background: #f4f4f4;
+      color: #111111;
+    }
+    body.light .container {
+      background: #ffffff;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    body.light input, body.light select {
+      background-color: #ffffff;
+      color: #000;
+      border: 1px solid #ccc;
+    }
+    body.light .result {
+      background: #eeeeee;
+      color: #000;
+    }
+    body.light button {
+      background-color: #000;
+      color: #fff;
+    }
+    body.light label {
+      color: #333;
+    }
+    body.light .notice {
+      color: #666;
+    }
+    .settings {
+      display: none;
+    }
   </style>
 </head>
 <body>
-<div class="container">
+<div class="container" id="mainPage">
+  <div class="theme-toggle-wrapper">
+    🌙<label class="switch">
+      <input type="checkbox" id="themeSwitch">
+      <span class="slider"></span>
+    </label>☀️
+  </div>
   <h2>💱 卡 vs 現金</h2>
+  <button onclick="toggleSettings()">⚙️ 自訂匯率設定</button>
   <label>幣別</label>
   <select id="currency">
-    <option value="JPY">日圓 (JPY)</option>
-    <option value="KRW">韓元 (KRW)</option>
-    <option value="USD">美元 (USD)</option>
-    <option value="EUR">歐元 (EUR)</option>
+    <option value="JPY">🇯🇵 日圓 (JPY)</option>
+    <option value="KRW">🇰🇷 韓元 (KRW)</option>
+    <option value="USD">🇺🇸 美元 (USD)</option>
+    <option value="EUR">🇪🇺 歐元 (EUR)</option>
   </select>
   <label>商品價格（以所選幣別計）</label>
   <input type="number" id="amount" value="10000">
@@ -76,6 +165,7 @@
   <label>信用卡匯率</label>
   <input type="number" step="0.0001" id="cardRate" value="0.2225">
   <div id="rateNotice" class="notice"></div>
+  <div id="rateTime" class="notice"></div>
   <button onclick="loadRate()">重新取得即時匯率</button>
   <label>信用卡回饋百分比</label>
   <input type="number" step="0.1" id="cardCashback" value="3">
@@ -86,23 +176,115 @@
   <button onclick="calculate()">計算！</button>
   <div class="result" id="output"></div>
 </div>
+<div class="container settings" id="settingsPage">
+  <h2>⚙️ 設定預設值</h2>
+  <label>幣別</label>
+  <select id="settingCurrency" onchange="updateSettingInputs()">
+    <option value="JPY">🇯🇵 日圓 (JPY)</option>
+    <option value="KRW">🇰🇷 韓元 (KRW)</option>
+    <option value="USD">🇺🇸 美元 (USD)</option>
+    <option value="EUR">🇪🇺 歐元 (EUR)</option>
+  </select>
+  <label>自訂匯率（預設）</label>
+  <input type="number" id="defaultDualRate" step="0.0001">
+  <label>自訂回饋百分比（預設）</label>
+  <input type="number" id="defaultDualCashback" step="0.1">
+  <button onclick="saveSettings()">💾 儲存設定</button>
+  <button onclick="toggleSettings()">↩️ 返回主畫面</button>
+</div>
 <script>
+  function toggleSettings() {
+    const isSettingsOpen = document.getElementById("settingsPage").style.display === "block";
+    document.getElementById("mainPage").style.display = isSettingsOpen ? "block" : "none";
+    document.getElementById("settingsPage").style.display = isSettingsOpen ? "none" : "block";
+
+    if (!isSettingsOpen) {
+      const cur = document.getElementById("currency").value;
+      document.getElementById("settingCurrency").value = cur;
+      updateSettingInputs();
+    }
+  }
+
+  function updateSettingInputs() {
+    const selected = document.getElementById("settingCurrency").value;
+    document.getElementById("defaultDualRate").value = localStorage.getItem(`defaultDualRate_${selected}`) || "";
+    document.getElementById("defaultDualCashback").value = localStorage.getItem(`defaultDualCashback_${selected}`) || "";
+  }
+
+  function saveSettings() {
+    const cur = document.getElementById("settingCurrency").value;
+    const rate = document.getElementById("defaultDualRate").value;
+    const cashback = document.getElementById("defaultDualCashback").value;
+    localStorage.setItem(`defaultDualRate_${cur}`, rate);
+    localStorage.setItem(`defaultDualCashback_${cur}`, cashback);
+
+    document.getElementById("currency").value = cur;
+    document.getElementById("dualRate").value = rate;
+    document.getElementById("dualCashback").value = cashback;
+
+    alert("設定已儲存！");
+    toggleSettings();
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    const savedTheme = localStorage.getItem("themeMode");
+    if (savedTheme === "light") {
+      document.body.classList.add("light");
+      document.getElementById("themeSwitch").checked = true;
+    }
+    const savedFields = ["amount", "dualRate", "dualCashback", "cardRate", "cardCashback"];
+    savedFields.forEach(id => {
+      if (localStorage.getItem(id)) {
+        document.getElementById(id).value = localStorage.getItem(id);
+      }
+    });
+    const cur = document.getElementById("currency").value;
+    const defaultRate = localStorage.getItem(`defaultDualRate_${cur}`);
+    const defaultCashback = localStorage.getItem(`defaultDualCashback_${cur}`);
+    document.getElementById("dualRate").value = defaultRate || "";
+    document.getElementById("dualCashback").value = defaultCashback || "";
+    document.getElementById("currency").addEventListener("change", () => {
+      loadRate();
+      const cur = document.getElementById("currency").value;
+      const defaultRate = localStorage.getItem(`defaultDualRate_${cur}`);
+      const defaultCashback = localStorage.getItem(`defaultDualCashback_${cur}`);
+      document.getElementById("dualRate").value = defaultRate || "";
+      document.getElementById("dualCashback").value = defaultCashback || "";
+    });
+    document.getElementById("themeSwitch").addEventListener("change", function () {
+      const isLight = this.checked;
+      document.body.classList.toggle("light", isLight);
+      localStorage.setItem("themeMode", isLight ? "light" : "dark");
+    });
+    loadRate();
+  });
+
   function loadRate() {
     const currency = document.getElementById("currency").value;
-    fetch("https://open.er-api.com/v6/latest/TWD")
-      .then(response => response.json())
-      .then(data => {
-        const toTWD = 1 / data.rates[currency];
-        document.getElementById("cardRate").value = toTWD.toFixed(4);
-        document.getElementById("rateNotice").textContent = `已自動載入即時匯率（1 ${currency} ≈ ${toTWD.toFixed(4)} TWD）`;
-      })
-      .catch(() => {
-        document.getElementById("rateNotice").textContent = "⚠️ 無法取得即時匯率，請手動輸入。";
-      });
+    document.getElementById("rateNotice").textContent = "載入中... ⏳";
+    setTimeout(() => {
+      fetch("https://open.er-api.com/v6/latest/TWD")
+        .then(response => response.json())
+        .then(data => {
+          const toTWD = 1 / data.rates[currency];
+          document.getElementById("cardRate").value = toTWD.toFixed(4);
+          const now = new Date();
+          const timeStr = now.toLocaleTimeString("zh-Hant", { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+          document.getElementById("rateTime").textContent = `更新時間：${timeStr}`;
+          document.getElementById("rateNotice").textContent = `已自動載入即時匯率（1 ${currency} ≈ ${toTWD.toFixed(4)} TWD）`;
+        })
+        .catch(() => {
+          document.getElementById("rateNotice").textContent = "⚠️ 無法取得即時匯率，請手動輸入。";
+        });
+    }, 1000);
   }
-  document.addEventListener("DOMContentLoaded", loadRate);
-  document.getElementById("currency").addEventListener("change", loadRate);
+
   function calculate() {
+    const persistFields = ["amount", "dualRate", "dualCashback", "cardRate", "cardCashback"];
+    persistFields.forEach(id => {
+      localStorage.setItem(id, document.getElementById(id).value);
+    });
+
     const amount = parseFloat(document.getElementById("amount").value);
     const dual = amount * parseFloat(document.getElementById("dualRate").value);
     const dualFinal = dual * (1 - parseFloat(document.getElementById("dualCashback").value) / 100);
@@ -112,10 +294,14 @@
     const cardFinal = card * (1 - parseFloat(document.getElementById("cardCashback").value) / 100);
     let suggestion = "✅ 建議使用自訂匯率卡！";
     if (cardFinal < dualFinal) suggestion = "✅ 建議使用一般信用卡！";
+    const savings = Math.abs(dualFinal - cardFinal);
+    const fries = Math.floor(savings / 30);
     document.getElementById("output").innerHTML = `
+      <strong>商品價格：</strong> ${amount.toLocaleString()} ${document.getElementById("currency").value}<br><br>
       <strong>自訂匯率卡：</strong> ${dualFinal.toFixed(2)} 元<br>
       <strong>一般信用卡：</strong> ${cardFinal.toFixed(2)} 元<br><br>
-      <strong>${suggestion}</strong>
+      <strong>${suggestion}</strong><br>
+      💰 差價約 ${savings.toFixed(2)} 元，可多吃 ${fries} 包薯條 🍟
     `;
   }
 </script>
