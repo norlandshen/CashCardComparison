@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>卡 vs 現金</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#4CAF50" />
+  <link rel="icon" href="icon.png">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      background: #f5f5f5;
+      margin: 0;
+      padding: 1rem;
+    }
+    .container {
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 1.5rem;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h2 { text-align: center; margin-bottom: 1rem; }
+    label { display: block; margin: 0.5rem 0 0.2rem; font-weight: bold; }
+    input, select {
+      width: 100%; padding: 0.6rem; margin-bottom: 0.8rem;
+      font-size: 1rem; border-radius: 8px; border: 1px solid #ccc;
+    }
+    button {
+      width: 100%; padding: 0.8rem; font-size: 1.1rem;
+      border-radius: 8px; border: none; background-color: #4CAF50;
+      color: white; font-weight: bold; margin-top: 1rem;
+    }
+    .notice { font-size: 0.9rem; color: #4CAF50; margin-top: -0.6rem; margin-bottom: 1rem; }
+    .result {
+      margin-top: 1.5rem; padding: 1rem; background: #f0f0f0;
+      border-radius: 8px; font-size: 1rem;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h2>💱 卡 vs 現金</h2>
+  <label>幣別</label>
+  <select id="currency">
+    <option value="JPY">日圓 (JPY)</option>
+    <option value="KRW">韓元 (KRW)</option>
+    <option value="USD">美元 (USD)</option>
+    <option value="EUR">歐元 (EUR)</option>
+  </select>
+  <label>商品價格（以所選幣別計）</label>
+  <input type="number" id="amount" value="10000">
+  <h3>💳 自訂匯率卡（雙幣卡或現金）</h3>
+  <label>匯率</label>
+  <input type="number" step="0.0001" id="dualRate" value="0.219">
+  <label>回饋百分比（現金請填 0）</label>
+  <input type="number" step="0.1" id="dualCashback" value="1">
+  <h3>💳 一般信用卡</h3>
+  <label>信用卡匯率</label>
+  <input type="number" step="0.0001" id="cardRate" value="0.2225">
+  <div id="rateNotice" class="notice"></div>
+  <button onclick="loadRate()">重新取得即時匯率</button>
+  <label>信用卡回饋百分比</label>
+  <input type="number" step="0.1" id="cardCashback" value="3">
+  <label><input type="checkbox" id="includeFee" checked> 考慮 1.5% 海外手續費</label>
+  <button onclick="calculate()">計算！</button>
+  <div class="result" id="output"></div>
+</div>
+<script>
+  function loadRate() {
+    const currency = document.getElementById("currency").value;
+    fetch("https://open.er-api.com/v6/latest/TWD")
+      .then(response => response.json())
+      .then(data => {
+        const toTWD = 1 / data.rates[currency];
+        document.getElementById("cardRate").value = toTWD.toFixed(4);
+        document.getElementById("rateNotice").textContent = `已自動載入即時匯率（1 ${currency} ≈ ${toTWD.toFixed(4)} TWD）`;
+      })
+      .catch(() => {
+        document.getElementById("rateNotice").textContent = "⚠️ 無法取得即時匯率，請手動輸入。";
+      });
+  }
+  document.addEventListener("DOMContentLoaded", loadRate);
+  document.getElementById("currency").addEventListener("change", loadRate);
+  function calculate() {
+    const amount = parseFloat(document.getElementById("amount").value);
+    const dual = amount * parseFloat(document.getElementById("dualRate").value);
+    const dualFinal = dual * (1 - parseFloat(document.getElementById("dualCashback").value) / 100);
+    const cardRate = parseFloat(document.getElementById("cardRate").value);
+    const cardFinalRate = document.getElementById("includeFee").checked ? cardRate * 1.015 : cardRate;
+    const card = amount * cardFinalRate;
+    const cardFinal = card * (1 - parseFloat(document.getElementById("cardCashback").value) / 100);
+    let suggestion = "✅ 建議使用自訂匯率卡！";
+    if (cardFinal < dualFinal) suggestion = "✅ 建議使用一般信用卡！";
+    document.getElementById("output").innerHTML = `
+      <strong>自訂匯率卡：</strong> ${dualFinal.toFixed(2)} 元<br>
+      <strong>一般信用卡：</strong> ${cardFinal.toFixed(2)} 元<br><br>
+      <strong>${suggestion}</strong>
+    `;
+  }
+</script>
+</body>
+</html>
